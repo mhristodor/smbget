@@ -42,13 +42,6 @@ func NewSMBClient(username string, password string, domain string, server_addr s
         dial: dial,
     }
 
-
-    err := s.connect()
-
-    if err != nil {
-        return s, err
-    }
-
     return s, nil
 }
 
