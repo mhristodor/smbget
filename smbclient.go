@@ -66,7 +66,7 @@ func (c *SMBClient) connect() (err error) {
 		return nil
 	}
 
-	c.conn, err = net.Dial("tcp", c.share_name + ":445")
+	c.conn, err = net.Dial("tcp", c.server_addr + ":445")
 
 	if err != nil {
 		return err
@@ -155,13 +155,12 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
 		return nil, fmt.Errorf("%s is not a directory", remotePath)
 	}
 
-
 	matches, err := iofs.Glob(c.share.DirFS(remotePath), "*")
 	if err != nil {
 		panic(err)
 	}
 
-	filtered_matches := make([]string, len(matches))
+	filtered_matches := make([]string, 0)
 
 	status := make(map[string][]string)
 
@@ -169,7 +168,7 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
 
 	for _, ext := range excludeExt {
 		for _, match := range matches {
-			if filepath.Ext(match) != ext {
+			if !strings.HasSuffix(match, ext) {
 				
 				filtered_matches = append(filtered_matches, filepath.Join(remotePath, match))
 				
@@ -182,13 +181,14 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
 
 	for _, match := range filtered_matches {
 
-		err = c.GetFile(match, filepath.Join(localPath, match), longest - len(filepath.Base(match)))
+		err = c.GetFile(match, filepath.Join(localPath,filepath.Base(match)), longest - len(filepath.Base(match)))
 
 		if err != nil {
 			status["failed"] = append(status["failed"], filepath.Base(match))
+			panic(err)
+		}else{
+			status["success"] = append(status["success"], filepath.Base(match))
 		}
-
-		status["success"] = append(status["success"], filepath.Base(match))
 	}
 
 	return status, nil
