@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	iofs "io/fs"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -42,7 +43,35 @@ func NewSMBClient(username string, password string, domain string, server_addr s
         dial: dial,
     }
 
+    logger.Info("Created new SMBClient", slog.Any("object", s))
+
     return s, nil
+}
+
+func (c *SMBClient) connectShare() (err error) {
+    
+    c.share, err = c.session.Mount(c.share_name)
+
+    if err != nil {
+        return err
+    }
+
+    logger.Info("Connected to SMB Share")
+    
+    return nil
+}
+
+func (c *SMBClient) connectSession() (err error){
+    
+    c.session, err = c.dial.Dial(c.conn)
+
+    if err != nil {
+        return err
+    }
+
+    logger.Info("Connected to SMB Session")
+
+    return nil
 }
 
 func (c *SMBClient) connect() (err error) {
@@ -52,11 +81,19 @@ func (c *SMBClient) connect() (err error) {
     }
 
     if c.session != nil{
-        return nil
+
+        return c.connectShare()
     }
 
     if c.conn != nil{
-        return nil
+        
+        err = c.connectSession()
+
+        if err != nil {
+            return err
+        }
+
+        return c.connectShare()
     }
 
     c.conn, err = net.Dial("tcp", c.server_addr + ":445")
@@ -65,13 +102,15 @@ func (c *SMBClient) connect() (err error) {
         return err
     }
 
-    c.session, err = c.dial.Dial(c.conn)
+    logger.Info("Connected to SMB Server")
 
+    err = c.connectSession()
+    
     if err != nil {
         return err
     }
 
-    c.share, err = c.session.Mount(c.share_name)
+    err = c.connectShare()
 
     if err != nil {
         return err
@@ -129,9 +168,13 @@ func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int)
 
     defer local_file.Close()
 
-    io.Copy(io.MultiWriter(local_file, bar), remote_file)
+    absLocalPath , _ := filepath.Abs(localPath) 
     
-    return nil
+    logger.Info("Trying to transfer file", slog.String("remote", remotePath), slog.String("local", absLocalPath))
+
+    _, err = io.Copy(io.MultiWriter(local_file, bar), remote_file)
+    
+    return err
 }
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {
@@ -141,7 +184,7 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
     stats, err := c.share.Stat(remotePath)
 
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("%s path does not exist", remotePath)
     }
 
     if !stats.IsDir() {
@@ -149,8 +192,9 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
     }
 
     matches, err := iofs.Glob(c.share.DirFS(remotePath), "*")
+    
     if err != nil {
-        panic(err)
+        return nil, err
     }
 
     filtered_matches := make([]string, 0)
@@ -171,6 +215,8 @@ func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt
             }
         }
     }
+
+    logger.Info("Found valid files for transfer", slog.Int("count", len(filtered_matches)))
 
     for _, match := range filtered_matches {
 
