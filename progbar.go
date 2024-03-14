@@ -22,8 +22,8 @@ func GetProgressBar(size int64, descr string, padding string) *progressbar.Progr
         progressbar.OptionSetTheme(progressbar.Theme{
             Saucer:        "[green]=[reset]",
             SaucerHead:    "[green]>[reset]",
-            SaucerPadding: " ",
-            BarStart:       "[green]|",
-            BarEnd:       "[green]|[reset]",
+            SaucerPadding: "[white]•[reset]",
+            BarStart:       "[green][",
+            BarEnd:       "[green]][reset]",
         }))
 }
