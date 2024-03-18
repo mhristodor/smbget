@@ -13,222 +13,218 @@ import (
 	"github.com/hirochachacha/go-smb2"
 )
 
-type SMBClient struct{
+type SMBClient struct {
+	share_name  string
+	server_addr string
 
-    share_name string
-    server_addr string
+	dial *smb2.Dialer
 
-    dial *smb2.Dialer
-
-    conn net.Conn
-    session *smb2.Session
-    share *smb2.Share
-
+	conn    net.Conn
+	session *smb2.Session
+	share   *smb2.Share
 }
-
 
 func NewSMBClient(username string, password string, domain string, server_addr string, share_name string) (SMBClient, error) {
 
-    dial := &smb2.Dialer{
-        Initiator: &smb2.NTLMInitiator{
-            User:     username,
-            Password: password,
-            Domain:   domain,
-        },
-    }
+	dial := &smb2.Dialer{
+		Initiator: &smb2.NTLMInitiator{
+			User:     username,
+			Password: password,
+			Domain:   domain,
+		},
+	}
 
-    s := SMBClient{
-        share_name: share_name,
-        server_addr: server_addr,
-        dial: dial,
-    }
+	s := SMBClient{
+		share_name:  share_name,
+		server_addr: server_addr,
+		dial:        dial,
+	}
 
-    logger.Info("Created new SMBClient", slog.Any("object", s))
+	logger.Info("Created new SMBClient", slog.Any("object", s))
 
-    return s, nil
+	return s, nil
 }
 
 func (c *SMBClient) connectShare() (err error) {
-    
-    c.share, err = c.session.Mount(c.share_name)
 
-    if err != nil {
-        return err
-    }
+	c.share, err = c.session.Mount(c.share_name)
 
-    logger.Info("Connected to SMB Share")
-    
-    return nil
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Connected to SMB Share")
+
+	return nil
 }
 
-func (c *SMBClient) connectSession() (err error){
-    
-    c.session, err = c.dial.Dial(c.conn)
+func (c *SMBClient) connectSession() (err error) {
 
-    if err != nil {
-        return err
-    }
+	c.session, err = c.dial.Dial(c.conn)
 
-    logger.Info("Connected to SMB Session")
+	if err != nil {
+		return err
+	}
 
-    return nil
+	logger.Info("Connected to SMB Session")
+
+	return nil
 }
 
 func (c *SMBClient) connect() (err error) {
 
-    if c.share != nil{
-        return nil
-    }
+	if c.share != nil {
+		return nil
+	}
 
-    if c.session != nil{
+	if c.session != nil {
 
-        return c.connectShare()
-    }
+		return c.connectShare()
+	}
 
-    if c.conn != nil{
-        
-        err = c.connectSession()
+	if c.conn != nil {
 
-        if err != nil {
-            return err
-        }
+		err = c.connectSession()
 
-        return c.connectShare()
-    }
+		if err != nil {
+			return err
+		}
 
-    c.conn, err = net.Dial("tcp", c.server_addr + ":445")
+		return c.connectShare()
+	}
 
-    if err != nil {
-        return err
-    }
+	c.conn, err = net.Dial("tcp", c.server_addr+":445")
 
-    logger.Info("Connected to SMB Server")
+	if err != nil {
+		return err
+	}
 
-    err = c.connectSession()
-    
-    if err != nil {
-        return err
-    }
+	logger.Info("Connected to SMB Server")
 
-    err = c.connectShare()
+	err = c.connectSession()
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    return nil
+	err = c.connectShare()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
-
 
 func (c *SMBClient) Disconnect() error {
 
-    if c.share != nil{
-        c.share.Umount()
-    }
+	if c.share != nil {
+		_ = c.share.Umount()
+	}
 
-    if c.session != nil{
-        c.session.Logoff()
-    }
+	if c.session != nil {
+		_ = c.session.Logoff()
+	}
 
-    if c.conn != nil{
-        c.conn.Close()
-    }
+	if c.conn != nil {
+		c.conn.Close()
+	}
 
-    return nil
+	return nil
 }
 
 func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int) error {
 
-    c.connect()
-    
-    remote_file, err := c.share.Open(remotePath)
+	_ = c.connect()
 
-    if err != nil {
-        return err
-    }
+	remote_file, err := c.share.Open(remotePath)
 
-    defer remote_file.Close()
+	if err != nil {
+		return err
+	}
 
-    stats, err := c.share.Stat(remotePath)
+	defer remote_file.Close()
 
-    if err != nil {
-        return err
-    }
+	stats, err := c.share.Stat(remotePath)
 
-    size := stats.Size()
-    padding := strings.Repeat(" ", progBarPad)
+	if err != nil {
+		return err
+	}
 
-    bar := GetProgressBar(size, filepath.Base(remotePath), padding)
+	size := stats.Size()
+	padding := strings.Repeat(" ", progBarPad)
 
-    local_file, err := os.Create(localPath)
+	bar := GetProgressBar(size, filepath.Base(remotePath), padding)
 
-    if err != nil {
-        return err
-    }
+	local_file, err := os.Create(localPath)
 
-    defer local_file.Close()
+	if err != nil {
+		return err
+	}
 
-    absLocalPath , _ := filepath.Abs(localPath) 
-    
-    logger.Info("Trying to transfer file", slog.String("remote", remotePath), slog.String("local", absLocalPath))
+	defer local_file.Close()
 
-    _, err = io.Copy(io.MultiWriter(local_file, bar), remote_file)
-    
-    return err
+	absLocalPath, _ := filepath.Abs(localPath)
+
+	logger.Info("Trying to transfer file", slog.String("remote", remotePath), slog.String("local", absLocalPath))
+
+	_, err = io.Copy(io.MultiWriter(local_file, bar), remote_file)
+
+	return err
 }
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {
-    
-    c.connect()
-    
-    stats, err := c.share.Stat(remotePath)
 
-    if err != nil {
-        return nil, fmt.Errorf("%s path does not exist", remotePath)
-    }
+	_ = c.connect()
 
-    if !stats.IsDir() {
-        return nil, fmt.Errorf("%s is not a directory", remotePath)
-    }
+	stats, err := c.share.Stat(remotePath)
 
-    matches, err := iofs.Glob(c.share.DirFS(remotePath), "*")
-    
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, fmt.Errorf("%s path does not exist", remotePath)
+	}
 
-    filtered_matches := make([]string, 0)
+	if !stats.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", remotePath)
+	}
 
-    status := make(map[string][]string)
+	matches, err := iofs.Glob(c.share.DirFS(remotePath), "*")
 
-    longest := 0
+	if err != nil {
+		return nil, err
+	}
 
-    for _, ext := range excludeExt {
-        for _, match := range matches {
-            if !strings.HasSuffix(match, ext) {
-                
-                filtered_matches = append(filtered_matches, filepath.Join(remotePath, match))
-                
-                if len(match) > longest {
-                    longest = len(match)
-                }
-            }
-        }
-    }
+	filtered_matches := make([]string, 0)
 
-    logger.Info("Found valid files for transfer", slog.Int("count", len(filtered_matches)))
+	status := make(map[string][]string)
 
-    for _, match := range filtered_matches {
+	longest := 0
 
-        err = c.GetFile(match, filepath.Join(localPath,filepath.Base(match)), longest - len(filepath.Base(match)))
+	for _, ext := range excludeExt {
+		for _, match := range matches {
+			if !strings.HasSuffix(match, ext) {
 
-        if err != nil {
-            status["failed"] = append(status["failed"], filepath.Base(match))
-            panic(err)
-        }else{
-            status["success"] = append(status["success"], filepath.Base(match))
-        }
-    }
+				filtered_matches = append(filtered_matches, filepath.Join(remotePath, match))
 
-    return status, nil
+				if len(match) > longest {
+					longest = len(match)
+				}
+			}
+		}
+	}
+
+	logger.Info("Found valid files for transfer", slog.Int("count", len(filtered_matches)))
+
+	for _, match := range filtered_matches {
+
+		err = c.GetFile(match, filepath.Join(localPath, filepath.Base(match)), longest-len(filepath.Base(match)))
+
+		if err != nil {
+			status["failed"] = append(status["failed"], filepath.Base(match))
+			panic(err)
+		} else {
+			status["success"] = append(status["success"], filepath.Base(match))
+		}
+	}
+
+	return status, nil
 }
