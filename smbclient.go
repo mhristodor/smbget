@@ -19,9 +19,7 @@ type SMBClient struct {
 
 	dial *smb2.Dialer
 
-	conn    net.Conn
-	session *smb2.Session
-	share   *smb2.Share
+	share *smb2.Share
 }
 
 func NewSMBClient(username string, password string, domain string, server_addr string, share_name string) (SMBClient, error) {
@@ -45,9 +43,29 @@ func NewSMBClient(username string, password string, domain string, server_addr s
 	return s, nil
 }
 
-func (c *SMBClient) connectShare() (err error) {
+func (c *SMBClient) connect() (err error) {
 
-	c.share, err = c.session.Mount(c.share_name)
+	if c.share != nil {
+		return nil
+	}
+
+	conn, err := net.Dial("tcp", c.server_addr+":445")
+
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Connected to SMB Server")
+
+	session, err := c.dial.Dial(conn)
+
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Connected to SMB Session")
+
+	c.share, err = session.Mount(c.share_name)
 
 	if err != nil {
 		return err
@@ -58,76 +76,10 @@ func (c *SMBClient) connectShare() (err error) {
 	return nil
 }
 
-func (c *SMBClient) connectSession() (err error) {
-
-	c.session, err = c.dial.Dial(c.conn)
-
-	if err != nil {
-		return err
-	}
-
-	logger.Info("Connected to SMB Session")
-
-	return nil
-}
-
-func (c *SMBClient) connect() (err error) {
-
-	if c.share != nil {
-		return nil
-	}
-
-	if c.session != nil {
-
-		return c.connectShare()
-	}
-
-	if c.conn != nil {
-
-		err = c.connectSession()
-
-		if err != nil {
-			return err
-		}
-
-		return c.connectShare()
-	}
-
-	c.conn, err = net.Dial("tcp", c.server_addr+":445")
-
-	if err != nil {
-		return err
-	}
-
-	logger.Info("Connected to SMB Server")
-
-	err = c.connectSession()
-
-	if err != nil {
-		return err
-	}
-
-	err = c.connectShare()
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (c *SMBClient) Disconnect() error {
 
 	if c.share != nil {
-		_ = c.share.Umount()
-	}
-
-	if c.session != nil {
-		_ = c.session.Logoff()
-	}
-
-	if c.conn != nil {
-		c.conn.Close()
+		return c.share.Umount()
 	}
 
 	return nil
@@ -135,7 +87,11 @@ func (c *SMBClient) Disconnect() error {
 
 func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int) error {
 
-	_ = c.connect()
+	err := c.connect()
+
+	if err != nil {
+		return err
+	}
 
 	remote_file, err := c.share.Open(remotePath)
 
@@ -175,7 +131,11 @@ func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int)
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {
 
-	_ = c.connect()
+	err := c.connect()
+
+	if err != nil {
+		return nil, err
+	}
 
 	stats, err := c.share.Stat(remotePath)
 
