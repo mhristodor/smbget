@@ -10,19 +10,20 @@ func GetProgressBar(size int64, descr string, padding string) *progressbar.Progr
 	return progressbar.NewOptions64(size,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
+		progressbar.OptionSetRenderBlankState(true),
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowElapsedTimeOnFinish(),
 		progressbar.OptionSetVisibility(true),
 		progressbar.OptionSetElapsedTime(true),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Printf("\n")
+			fmt.Println()
 		}),
-		progressbar.OptionSetDescription(descr+padding),
+		progressbar.OptionSetDescription("[light_magenta]"+descr+padding+"[reset]"),
 		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "[green]=[reset]",
-			SaucerHead:    "[green]>[reset]",
-			SaucerPadding: "[white]•[reset]",
-			BarStart:      "[green][",
-			BarEnd:        "[green]][reset]",
+			Saucer:        "[light_green]=[reset]",
+			SaucerHead:    "[light_green]>[reset]",
+			SaucerPadding: "[dark_gray]•[reset]",
+			BarStart:      "[cyan][",
+			BarEnd:        "[cyan]][reset]",
 		}))
 }

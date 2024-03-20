@@ -126,7 +126,13 @@ func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int)
 
 	_, err = io.Copy(io.MultiWriter(local_file, bar), remote_file)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Successfully transferred file", slog.Float64("time", bar.State().SecondsSince), slog.Float64("size", bar.State().CurrentBytes))
+
+	return bar.Close()
 }
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {
