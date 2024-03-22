@@ -38,7 +38,7 @@ func NewSMBClient(username string, password string, domain string, server_addr s
 		dial:        dial,
 	}
 
-	logger.Info("Created new SMBClient", slog.Any("object", s))
+	logger.Info("Created new SMBClient", slog.String("object", fmt.Sprintf("%+v", s)))
 
 	return s, nil
 }
@@ -133,6 +133,32 @@ func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int)
 	logger.Info("Successfully transferred file", slog.Float64("time", bar.State().SecondsSince), slog.Float64("size", bar.State().CurrentBytes))
 
 	return bar.Close()
+}
+
+func (c *SMBClient) ReadFile(filePath string) (string, error) {
+
+	err := c.connect()
+
+	if err != nil {
+		return "", err
+	}
+
+	file, err := c.share.Open(filePath)
+
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+
 }
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {

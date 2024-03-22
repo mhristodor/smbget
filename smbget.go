@@ -10,7 +10,7 @@ var logger *slog.Logger
 
 func init() {
 	var debug = os.Getenv("DEBUG") == "true"
-	var handler *slog.TextHandler
+	var handler *slog.JSONHandler
 
 	if debug {
 		opts := &slog.HandlerOptions{
@@ -18,10 +18,10 @@ func init() {
 			AddSource: true,
 		}
 
-		handler = slog.NewTextHandler(os.Stderr, opts)
+		handler = slog.NewJSONHandler(os.Stderr, opts)
 
 	} else {
-		handler = slog.NewTextHandler(io.Discard, nil)
+		handler = slog.NewJSONHandler(io.Discard, nil)
 	}
 
 	logger = slog.New(handler)
