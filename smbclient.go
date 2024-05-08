@@ -83,7 +83,7 @@ func (c *SMBClient) Disconnect() {
 
 func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int) error {
 
-	err := c.connect()
+	err := c.Connect()
 
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int)
 
 func (c *SMBClient) ReadFile(filePath string) (string, error) {
 
-	err := c.connect()
+	err := c.Connect()
 
 	if err != nil {
 		return "", err
@@ -159,7 +159,7 @@ func (c *SMBClient) ReadFile(filePath string) (string, error) {
 
 func (c *SMBClient) GetDirectory(remotePath string, localPath string, excludeExt []string) (map[string][]string, error) {
 
-	err := c.connect()
+	err := c.Connect()
 
 	if err != nil {
 		return nil, err
