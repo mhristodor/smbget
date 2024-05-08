@@ -22,7 +22,7 @@ type SMBClient struct {
 	share *smb2.Share
 }
 
-func NewSMBClient(username string, password string, domain string, server_addr string, share_name string) (SMBClient, error) {
+func NewSMBClient(username string, password string, domain string, server_addr string, share_name string) SMBClient {
 
 	dial := &smb2.Dialer{
 		Initiator: &smb2.NTLMInitiator{
@@ -40,10 +40,10 @@ func NewSMBClient(username string, password string, domain string, server_addr s
 
 	logger.Info("Created new SMBClient", slog.String("object", fmt.Sprintf("%+v", s)))
 
-	return s, nil
+	return s
 }
 
-func (c *SMBClient) connect() (err error) {
+func (c *SMBClient) Connect() (err error) {
 
 	if c.share != nil {
 		return nil
@@ -76,13 +76,9 @@ func (c *SMBClient) connect() (err error) {
 	return nil
 }
 
-func (c *SMBClient) Disconnect() error {
+func (c *SMBClient) Disconnect() {
 
-	if c.share != nil {
-		return c.share.Umount()
-	}
-
-	return nil
+	c.share.Umount()
 }
 
 func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int) error {
