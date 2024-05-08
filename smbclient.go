@@ -81,6 +81,26 @@ func (c *SMBClient) Disconnect() {
 	c.share.Umount()
 }
 
+func (c *SMBClient) ListDir(remotePath string) ([]string, error) {
+	stats, err := c.share.Stat(remotePath)
+
+	if err != nil {
+		return nil, fmt.Errorf("%s path does not exist", remotePath)
+	}
+
+	if !stats.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", remotePath)
+	}
+
+	matches, err := iofs.Glob(c.share.DirFS(remotePath), "*")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return matches, nil
+}
+
 func (c *SMBClient) GetFile(remotePath string, localPath string, progBarPad int) error {
 
 	err := c.Connect()
