@@ -81,6 +81,17 @@ func (c *SMBClient) Disconnect() {
 	c.share.Umount()
 }
 
+func (c *SMBClient) CheckPath(path string) error {
+
+	_, err := c.share.Stat(path)
+
+	if err != nil {
+		return fmt.Errorf("%s path does not exist", path)
+	}
+
+	return nil
+}
+
 func (c *SMBClient) ListDir(remotePath string) ([]string, error) {
 	stats, err := c.share.Stat(remotePath)
 
